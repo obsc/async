@@ -7,9 +7,9 @@ import (
 )
 
 func timer() {
-	// fmt.Println("starting timer")
+	fmt.Println("starting timer")
 	time.Sleep(3 * time.Second)
-	// fmt.Println("ending timer")
+	fmt.Println("ending timer")
 }
 
 func a() (m int, n int) {
@@ -27,9 +27,12 @@ func b(x int, y int) {
 }
 
 func main() {
-	// async.Deffered(timer)
-	async.Deffered(a).Bind(b).Bind(a)
-	async.Init(5, 10).Bind(b).Bind(a)
+	async.Deferred(timer)
+	async.Deferred(a).Fmap(b).Fmap(a)
+	async.Return(5, 10).Fmap(b).Fmap(a)
+	async.Deferred(a).
+		Fmap(b).
+		Fmap(a)
 	time.Sleep(10 * time.Second)
 	fmt.Println("done")
 }
