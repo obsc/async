@@ -4,14 +4,14 @@ import (
 	"reflect"
 )
 
-type deffered struct {
+type deferred struct {
 	ret  []reflect.Value
 	done bool
 	wait chan bool
 }
 
-func Deffered(f interface{}) *deffered {
-	def := &deffered{nil, false, make(chan bool)}
+func Deferred(f interface{}) *deferred {
+	def := &deferred{nil, false, make(chan bool)}
 	go func() {
 		ffun := reflect.ValueOf(f)
 		def.ret = ffun.Call(nil)
@@ -21,8 +21,8 @@ func Deffered(f interface{}) *deffered {
 	return def
 }
 
-func Init(v ...interface{}) *deffered {
-	def := &deffered{make([]reflect.Value, len(v)), true, make(chan bool)}
+func Return(v ...interface{}) *deferred {
+	def := &deferred{make([]reflect.Value, len(v)), true, make(chan bool)}
 	for i := range v {
 		def.ret[i] = reflect.ValueOf(v[i])
 	}
@@ -30,12 +30,12 @@ func Init(v ...interface{}) *deffered {
 	return def
 }
 
-func (def *deffered) IsDone() bool {
+func (def *deferred) IsDone() bool {
 	return def.done
 }
 
-func (def *deffered) Bind(f interface{}) *deffered {
-	newdef := &deffered{nil, false, make(chan bool)}
+func (def *deferred) Fmap(f interface{}) *deferred {
+	newdef := &deferred{nil, false, make(chan bool)}
 	go func() {
 		for _ = range def.wait {
 		}
@@ -43,6 +43,43 @@ func (def *deffered) Bind(f interface{}) *deffered {
 		ffun := reflect.ValueOf(f)
 		ftyp := reflect.TypeOf(f)
 		newdef.ret = ffun.Call(def.ret[0:ftyp.NumIn()])
+		newdef.done = true
+		close(newdef.wait)
+	}()
+	return newdef
+}
+
+func (def *deferred) Bind(f interface{}) *deferred {
+	newdef := &deferred{nil, false, make(chan bool)}
+	go func() {
+		for _ = range def.wait {
+		}
+
+		ffun := reflect.ValueOf(f)
+		ftyp := reflect.TypeOf(f)
+		next := ffun.Call(def.ret[0:ftyp.NumIn()])[0].Interface().(*deferred)
+
+		for _ = range next.wait {
+		}
+
+		newdef.ret = next.ret
+		newdef.done = true
+		close(newdef.wait)
+	}()
+	return newdef
+}
+
+func (def *deferred) Join(f interface{}) *deferred {
+	newdef := &deferred{nil, false, make(chan bool)}
+	go func() {
+		for _ = range def.wait {
+		}
+		defret := def.ret[0].Interface().(*deferred)
+
+		for _ = range defret.wait {
+		}
+
+		newdef.ret = defret.ret
 		newdef.done = true
 		close(newdef.wait)
 	}()
