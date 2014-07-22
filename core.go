@@ -4,14 +4,14 @@ import (
 	"reflect"
 )
 
-type deferred struct {
+type Async struct {
 	ret  []reflect.Value
 	done bool
 	wait chan bool
 }
 
-func Deferred(f interface{}) *deferred {
-	def := &deferred{nil, false, make(chan bool)}
+func Deferred(f interface{}) *Async {
+	def := &Async{nil, false, make(chan bool)}
 	go func() {
 		ffun := reflect.ValueOf(f)
 		def.ret = ffun.Call(nil)
@@ -21,8 +21,8 @@ func Deferred(f interface{}) *deferred {
 	return def
 }
 
-func Return(v ...interface{}) *deferred {
-	def := &deferred{make([]reflect.Value, len(v)), true, make(chan bool)}
+func Unit(v ...interface{}) *Async {
+	def := &Async{make([]reflect.Value, len(v)), true, make(chan bool)}
 	for i := range v {
 		def.ret[i] = reflect.ValueOf(v[i])
 	}
@@ -30,12 +30,8 @@ func Return(v ...interface{}) *deferred {
 	return def
 }
 
-func (def *deferred) IsDone() bool {
-	return def.done
-}
-
-func (def *deferred) Fmap(f interface{}) *deferred {
-	newdef := &deferred{nil, false, make(chan bool)}
+func (def *Async) Fmap(f interface{}) *Async {
+	newdef := &Async{nil, false, make(chan bool)}
 	go func() {
 		for _ = range def.wait {
 		}
@@ -49,15 +45,15 @@ func (def *deferred) Fmap(f interface{}) *deferred {
 	return newdef
 }
 
-func (def *deferred) Bind(f interface{}) *deferred {
-	newdef := &deferred{nil, false, make(chan bool)}
+func (def *Async) Bind(f interface{}) *Async {
+	newdef := &Async{nil, false, make(chan bool)}
 	go func() {
 		for _ = range def.wait {
 		}
 
 		ffun := reflect.ValueOf(f)
 		ftyp := reflect.TypeOf(f)
-		next := ffun.Call(def.ret[0:ftyp.NumIn()])[0].Interface().(*deferred)
+		next := ffun.Call(def.ret[0:ftyp.NumIn()])[0].Interface().(*Async)
 
 		for _ = range next.wait {
 		}
@@ -69,12 +65,12 @@ func (def *deferred) Bind(f interface{}) *deferred {
 	return newdef
 }
 
-func (def *deferred) Join(f interface{}) *deferred {
-	newdef := &deferred{nil, false, make(chan bool)}
+func (def *Async) Join(f interface{}) *Async {
+	newdef := &Async{nil, false, make(chan bool)}
 	go func() {
 		for _ = range def.wait {
 		}
-		defret := def.ret[0].Interface().(*deferred)
+		defret := def.ret[0].Interface().(*Async)
 
 		for _ = range defret.wait {
 		}
@@ -84,4 +80,8 @@ func (def *deferred) Join(f interface{}) *deferred {
 		close(newdef.wait)
 	}()
 	return newdef
+}
+
+func (def *Async) IsDone() bool {
+	return def.done
 }
