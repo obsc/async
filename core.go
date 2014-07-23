@@ -11,6 +11,20 @@ type Async struct {
 	wait chan bool
 }
 
+func concat(rets ...[]reflect.Value) []reflect.Value {
+	lens := 0
+	for _, v := range rets {
+		lens += len(v)
+	}
+	ret := make([]reflect.Value, lens)
+	curIndex := 0
+	for _, reti := range rets {
+		copy(ret[curIndex:curIndex+len(reti)], reti)
+		curIndex += len(reti)
+	}
+	return ret
+}
+
 // (unit -> a) -> M a
 func Deferred(f interface{}) *Async {
 	def := &Async{nil, false, make(chan bool)}
@@ -112,4 +126,36 @@ func (def *Async) Next(f interface{}) *Async {
 		close(newdef.wait)
 	}()
 	return newdef
+}
+
+// M a -> M b -> M (a, b)
+func (def *Async) And(other *Async) *Async {
+	newdef := &Async{nil, false, make(chan bool)}
+	go func() {
+		for _ = range def.wait {
+		}
+		for _ = range other.wait {
+		}
+
+		newdef.ret = concat(def.ret, other.ret)
+		newdef.done = true
+		close(newdef.wait)
+	}()
+	return newdef
+}
+
+// (a -> b) -> (M a -> M b)
+func Lift(f interface{}) func(*Async) *Async {
+	return func(def *Async) *Async {
+		return def.Fmap(f)
+	}
+}
+
+// ((a, b) -> c) -> M a -> M b -> M c
+func Lift2(f interface{}) func(*Async) func(*Async) *Async {
+	return func(def *Async) func(*Async) *Async {
+		return func(other *Async) *Async {
+			return def.And(other).Fmap(f)
+		}
+	}
 }
