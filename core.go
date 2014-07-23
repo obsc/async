@@ -4,12 +4,14 @@ import (
 	"reflect"
 )
 
+// M a
 type Async struct {
 	ret  []reflect.Value
 	done bool
 	wait chan bool
 }
 
+// (unit -> a) -> M a
 func Deferred(f interface{}) *Async {
 	def := &Async{nil, false, make(chan bool)}
 	go func() {
@@ -21,7 +23,8 @@ func Deferred(f interface{}) *Async {
 	return def
 }
 
-func Unit(v ...interface{}) *Async {
+// a -> M a
+func Return(v ...interface{}) *Async {
 	def := &Async{make([]reflect.Value, len(v)), true, make(chan bool)}
 	for i := range v {
 		def.ret[i] = reflect.ValueOf(v[i])
@@ -30,6 +33,7 @@ func Unit(v ...interface{}) *Async {
 	return def
 }
 
+// M a -> (a -> b) -> M b
 func (def *Async) Fmap(f interface{}) *Async {
 	newdef := &Async{nil, false, make(chan bool)}
 	go func() {
@@ -45,6 +49,7 @@ func (def *Async) Fmap(f interface{}) *Async {
 	return newdef
 }
 
+// M a -> (a -> M b) -> M b
 func (def *Async) Bind(f interface{}) *Async {
 	newdef := &Async{nil, false, make(chan bool)}
 	go func() {
@@ -65,6 +70,7 @@ func (def *Async) Bind(f interface{}) *Async {
 	return newdef
 }
 
+// M (M a) -> M a
 func (def *Async) Join(f interface{}) *Async {
 	newdef := &Async{nil, false, make(chan bool)}
 	go func() {
@@ -82,6 +88,28 @@ func (def *Async) Join(f interface{}) *Async {
 	return newdef
 }
 
+// M a -> bool
 func (def *Async) IsDone() bool {
 	return def.done
+}
+
+// M a -> unit
+func (def *Async) Wait() {
+	for _ = range def.wait {
+	}
+}
+
+// M a -> (unit -> b) -> M b
+func (def *Async) Next(f interface{}) *Async {
+	newdef := &Async{nil, false, make(chan bool)}
+	go func() {
+		for _ = range def.wait {
+		}
+
+		ffun := reflect.ValueOf(f)
+		newdef.ret = ffun.Call(nil)
+		newdef.done = true
+		close(newdef.wait)
+	}()
+	return newdef
 }

@@ -29,7 +29,7 @@ func b(x int, y int) {
 func main() {
 	async.Deferred(timer)
 	async.Deferred(a).Fmap(b).Fmap(a)
-	async.Unit(5, 10).Fmap(b).Fmap(a)
+	async.Return(5, 10).Fmap(b).Fmap(a)
 	async.Deferred(a).
 		Fmap(b).
 		Fmap(a)
