@@ -13,7 +13,7 @@ type Async struct {
 
 // (unit -> a) -> M a
 func Deferred(f interface{}) *Async {
-	return withNewAsync(func(newAsync *Async) []reflect.Value {
+	return withNewAsync(func() []reflect.Value {
 		ffun := reflect.ValueOf(f)
 		return ffun.Call(nil)
 	})
@@ -21,7 +21,7 @@ func Deferred(f interface{}) *Async {
 
 // a -> M a
 func Return(vs ...interface{}) *Async {
-	return withNewAsync(func(newAsync *Async) []reflect.Value {
+	return withNewAsync(func() []reflect.Value {
 		ret := make([]reflect.Value, len(vs))
 		for i := range vs {
 			ret[i] = reflect.ValueOf(vs[i])
@@ -32,7 +32,7 @@ func Return(vs ...interface{}) *Async {
 
 // M a -> (a -> b) -> M b
 func (self *Async) Fmap(f interface{}) *Async {
-	return withNewAsync(func(newAsync *Async) []reflect.Value {
+	return withNewAsync(func() []reflect.Value {
 		self.Wait()
 
 		ffun := reflect.ValueOf(f)
@@ -43,7 +43,7 @@ func (self *Async) Fmap(f interface{}) *Async {
 
 // M a -> (a -> M b) -> M b
 func (self *Async) Bind(f interface{}) *Async {
-	return withNewAsync(func(newAsync *Async) []reflect.Value {
+	return withNewAsync(func() []reflect.Value {
 		self.Wait()
 
 		ffun := reflect.ValueOf(f)
@@ -57,7 +57,7 @@ func (self *Async) Bind(f interface{}) *Async {
 
 // M (M a) -> M a
 func (self *Async) Join(f interface{}) *Async {
-	return withNewAsync(func(newAsync *Async) []reflect.Value {
+	return withNewAsync(func() []reflect.Value {
 		self.Wait()
 
 		selfRet := self.ret[0].Interface().(*Async)

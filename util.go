@@ -18,11 +18,13 @@ func concat(rets ...[]reflect.Value) []reflect.Value {
 	return ret
 }
 
-func withNewAsync(f func(newAsync *Async) []reflect.Value) *Async {
+func withNewAsync(fs ...func() []reflect.Value) *Async {
 	newAsync := &Async{nil, false, make(chan bool)}
-	go func() {
-		newAsync.complete(f(newAsync))
-	}()
+	for i := range fs {
+		go func() {
+			newAsync.complete(fs[i]())
+		}()
+	}
 	return newAsync
 }
 

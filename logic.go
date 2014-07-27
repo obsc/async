@@ -6,32 +6,30 @@ import (
 
 // M a -> M b -> M (a, b)
 func (self *Async) And(other *Async) *Async {
-	newAsync := &Async{nil, false, make(chan bool)}
-	go func() {
+	return withNewAsync(func() []reflect.Value {
 		self.Wait()
 		other.Wait()
 
-		newAsync.complete(concat(self.ret, other.ret))
-	}()
-	return newAsync
+		return concat(self.ret, other.ret)
+	})
 }
 
 // M a -> M a -> M a
 func (self *Async) Or(other *Async) *Async {
-	newAsync := &Async{nil, false, make(chan bool)}
-	waitFor := func(a *Async) {
-		a.Wait()
+	waitFor := func(a *Async) func() []reflect.Value {
+		return func() []reflect.Value {
+			a.Wait()
 
-		newAsync.complete(a.ret)
+			return a.ret
+		}
 	}
-	go waitFor(self)
-	go waitFor(other)
-	return newAsync
+
+	return withNewAsync(waitFor(self), waitFor(other))
 }
 
 // unit -> M unit
 func Always() *Async {
-	return withNewAsync(func(newAsync *Async) []reflect.Value {
+	return withNewAsync(func() []reflect.Value {
 		return nil
 	})
 }
