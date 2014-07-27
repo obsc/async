@@ -13,80 +13,58 @@ type Async struct {
 
 // (unit -> a) -> M a
 func Deferred(f interface{}) *Async {
-	newAsync := &Async{nil, false, make(chan bool)}
-	go func() {
+	return withNewAsync(func(newAsync *Async) []reflect.Value {
 		ffun := reflect.ValueOf(f)
-		newAsync.ret = ffun.Call(nil)
-		newAsync.done = true
-		close(newAsync.wait)
-	}()
-	return newAsync
+		return ffun.Call(nil)
+	})
 }
 
 // a -> M a
 func Return(vs ...interface{}) *Async {
-	newAsync := &Async{make([]reflect.Value, len(vs)), true, make(chan bool)}
-	for i := range vs {
-		newAsync.ret[i] = reflect.ValueOf(vs[i])
-	}
-	newAsync.done = true
-	close(newAsync.wait)
-	return newAsync
+	return withNewAsync(func(newAsync *Async) []reflect.Value {
+		ret := make([]reflect.Value, len(vs))
+		for i := range vs {
+			ret[i] = reflect.ValueOf(vs[i])
+		}
+		return ret
+	})
 }
 
 // M a -> (a -> b) -> M b
 func (self *Async) Fmap(f interface{}) *Async {
-	newAsync := &Async{nil, false, make(chan bool)}
-	go func() {
-		for _ = range self.wait {
-		}
+	return withNewAsync(func(newAsync *Async) []reflect.Value {
+		self.Wait()
 
 		ffun := reflect.ValueOf(f)
 		ftyp := reflect.TypeOf(f)
-		newAsync.ret = ffun.Call(self.ret[0:ftyp.NumIn()])
-		newAsync.done = true
-		close(newAsync.wait)
-	}()
-	return newAsync
+		return ffun.Call(self.ret[0:ftyp.NumIn()])
+	})
 }
 
 // M a -> (a -> M b) -> M b
 func (self *Async) Bind(f interface{}) *Async {
-	newAsync := &Async{nil, false, make(chan bool)}
-	go func() {
-		for _ = range self.wait {
-		}
+	return withNewAsync(func(newAsync *Async) []reflect.Value {
+		self.Wait()
 
 		ffun := reflect.ValueOf(f)
 		ftyp := reflect.TypeOf(f)
 		next := ffun.Call(self.ret[0:ftyp.NumIn()])[0].Interface().(*Async)
+		next.Wait()
 
-		for _ = range next.wait {
-		}
-
-		newAsync.ret = next.ret
-		newAsync.done = true
-		close(newAsync.wait)
-	}()
-	return newAsync
+		return next.ret
+	})
 }
 
 // M (M a) -> M a
 func (self *Async) Join(f interface{}) *Async {
-	newAsync := &Async{nil, false, make(chan bool)}
-	go func() {
-		for _ = range self.wait {
-		}
+	return withNewAsync(func(newAsync *Async) []reflect.Value {
+		self.Wait()
+
 		selfRet := self.ret[0].Interface().(*Async)
+		selfRet.Wait()
 
-		for _ = range selfRet.wait {
-		}
-
-		newAsync.ret = selfRet.ret
-		newAsync.done = true
-		close(newAsync.wait)
-	}()
-	return newAsync
+		return selfRet.ret
+	})
 }
 
 // M a -> bool
@@ -98,11 +76,6 @@ func (self *Async) IsDone() bool {
 func (self *Async) Wait() {
 	for _ = range self.wait {
 	}
-}
-
-// unit -> M a
-func Never() *Async {
-	return &Async{nil, false, make(chan bool)}
 }
 
 // (a -> b) -> (M a -> M b)

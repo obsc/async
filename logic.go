@@ -1,17 +1,17 @@
 package async
 
+import (
+	"reflect"
+)
+
 // M a -> M b -> M (a, b)
 func (self *Async) And(other *Async) *Async {
 	newAsync := &Async{nil, false, make(chan bool)}
 	go func() {
-		for _ = range self.wait {
-		}
-		for _ = range other.wait {
-		}
+		self.Wait()
+		other.Wait()
 
-		newAsync.ret = concat(self.ret, other.ret)
-		newAsync.done = true
-		close(newAsync.wait)
+		newAsync.complete(concat(self.ret, other.ret))
 	}()
 	return newAsync
 }
@@ -20,15 +20,23 @@ func (self *Async) And(other *Async) *Async {
 func (self *Async) Or(other *Async) *Async {
 	newAsync := &Async{nil, false, make(chan bool)}
 	waitFor := func(a *Async) {
-		defer recover()
-		for _ = range a.wait {
-		}
+		a.Wait()
 
-		close(newAsync.wait)
-		newAsync.ret = a.ret
-		newAsync.done = true
+		newAsync.complete(a.ret)
 	}
 	go waitFor(self)
 	go waitFor(other)
 	return newAsync
+}
+
+// unit -> M unit
+func Always() *Async {
+	return withNewAsync(func(newAsync *Async) []reflect.Value {
+		return nil
+	})
+}
+
+// unit -> M unit
+func Never() *Async {
+	return &Async{nil, false, make(chan bool)}
 }
