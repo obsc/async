@@ -4,14 +4,18 @@ import (
 	"reflect"
 )
 
-// M a
+// Type: M a
+// Represents the async monad
 type Async struct {
 	ret  []reflect.Value
 	done bool
 	wait chan bool
 }
 
-// (unit -> a) -> M a
+// Type: (unit -> a) -> M a
+//
+// Deferred executes a function asynchronously and returns an Async
+// struct representing the return values.
 func Deferred(f interface{}) *Async {
 	return withNewAsync(func() []reflect.Value {
 		ffun := reflect.ValueOf(f)
@@ -19,7 +23,10 @@ func Deferred(f interface{}) *Async {
 	})
 }
 
-// a -> M a
+// Type: a -> M a
+//
+// Return takes a set of inputs and returns an already determined Async
+// struct wrapping those inputs
 func Return(vs ...interface{}) *Async {
 	return withNewAsync(func() []reflect.Value {
 		ret := make([]reflect.Value, len(vs))
@@ -30,7 +37,18 @@ func Return(vs ...interface{}) *Async {
 	})
 }
 
-// M a -> (a -> b) -> M b
+// Type: M a -> (a -> b) -> M b
+//
+// Fmapping a function to self guarantees that function will execute on the
+// return values of self as soon self is determined. It returns an Async
+// struct representing the return values of the called function.
+//
+// If Fmap was called after self is already deteremined, the function will
+// begin to execute right away.
+//
+// Note that while this represents a functor, the input types are reversed.
+// This is done to make it a method rather than a function as Go does not
+// allow creation of new operators.
 func (self *Async) Fmap(f interface{}) *Async {
 	return withNewAsync(func() []reflect.Value {
 		self.Wait()
@@ -41,7 +59,10 @@ func (self *Async) Fmap(f interface{}) *Async {
 	})
 }
 
-// M a -> (a -> M b) -> M b
+// Type: M a -> (a -> M b) -> M b
+//
+// Bind behaves the same way as Fmap except it operates on functions
+// that return Async structs.
 func (self *Async) Bind(f interface{}) *Async {
 	return withNewAsync(func() []reflect.Value {
 		self.Wait()
@@ -55,7 +76,9 @@ func (self *Async) Bind(f interface{}) *Async {
 	})
 }
 
-// M (M a) -> M a
+// Type: M (M a) -> M a
+//
+// Join is used to unify multiple layers of Async structs.
 func (self *Async) Join(f interface{}) *Async {
 	return withNewAsync(func() []reflect.Value {
 		self.Wait()
@@ -67,25 +90,38 @@ func (self *Async) Join(f interface{}) *Async {
 	})
 }
 
-// M a -> bool
+// Type: M a -> bool
+//
+// IsDone returns whether or not self has becomed determined yet.
 func (self *Async) IsDone() bool {
 	return self.done
 }
 
-// M a -> unit
+// Type: M a -> unit
+//
+// Wait is a blocking function that waits until self has become determined.
 func (self *Async) Wait() {
 	for _ = range self.wait {
 	}
 }
 
-// (a -> b) -> (M a -> M b)
+// Type: (a -> b) -> (M a -> M b)
+//
+// Lift is another representation of Fmap with the types reversed.
+//
+// Lift can take any unary function and return a function that operates on
+// Async structs.
 func Lift(f interface{}) func(*Async) *Async {
 	return func(self *Async) *Async {
 		return self.Fmap(f)
 	}
 }
 
-// ((a, b) -> c) -> M a -> M b -> M c
+// Type: ((a, b) -> c) -> M a -> M b -> M c
+//
+// Lift2 behaves the same as lift except with binary functions.
+//
+// The parameters to the function are curried as well.
 func Lift2(f interface{}) func(*Async) func(*Async) *Async {
 	return func(self *Async) func(*Async) *Async {
 		return func(other *Async) *Async {
