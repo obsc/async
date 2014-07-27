@@ -1,34 +1,34 @@
 package async
 
 // M a -> M b -> M (a, b)
-func (def *Async) And(other *Async) *Async {
-	newdef := &Async{nil, false, make(chan bool)}
+func (self *Async) And(other *Async) *Async {
+	newAsync := &Async{nil, false, make(chan bool)}
 	go func() {
-		for _ = range def.wait {
+		for _ = range self.wait {
 		}
 		for _ = range other.wait {
 		}
 
-		newdef.ret = concat(def.ret, other.ret)
-		newdef.done = true
-		close(newdef.wait)
+		newAsync.ret = concat(self.ret, other.ret)
+		newAsync.done = true
+		close(newAsync.wait)
 	}()
-	return newdef
+	return newAsync
 }
 
 // M a -> M a -> M a
-func (def *Async) Or(other *Async) *Async {
-	newdef := &Async{nil, false, make(chan bool)}
-	waitFor := func(d *Async) {
+func (self *Async) Or(other *Async) *Async {
+	newAsync := &Async{nil, false, make(chan bool)}
+	waitFor := func(a *Async) {
 		defer recover()
-		for _ = range d.wait {
+		for _ = range a.wait {
 		}
 
-		close(newdef.wait)
-		newdef.ret = d.ret
-		newdef.done = true
+		close(newAsync.wait)
+		newAsync.ret = a.ret
+		newAsync.done = true
 	}
-	go waitFor(def)
+	go waitFor(self)
 	go waitFor(other)
-	return newdef
+	return newAsync
 }
