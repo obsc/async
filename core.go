@@ -11,20 +11,6 @@ type Async struct {
 	wait chan bool
 }
 
-func concat(rets ...[]reflect.Value) []reflect.Value {
-	lens := 0
-	for _, v := range rets {
-		lens += len(v)
-	}
-	ret := make([]reflect.Value, lens)
-	curIndex := 0
-	for _, reti := range rets {
-		copy(ret[curIndex:curIndex+len(reti)], reti)
-		curIndex += len(reti)
-	}
-	return ret
-}
-
 // (unit -> a) -> M a
 func Deferred(f interface{}) *Async {
 	def := &Async{nil, false, make(chan bool)}
@@ -113,7 +99,12 @@ func (def *Async) Wait() {
 	}
 }
 
-// M a -> (unit -> b) -> M b
+// unit -> M unit
+func Never() *Async {
+	return &Async{nil, false, make(chan bool)}
+}
+
+// M a -> (a ->
 func (def *Async) Next(f interface{}) *Async {
 	newdef := &Async{nil, false, make(chan bool)}
 	go func() {
@@ -122,22 +113,6 @@ func (def *Async) Next(f interface{}) *Async {
 
 		ffun := reflect.ValueOf(f)
 		newdef.ret = ffun.Call(nil)
-		newdef.done = true
-		close(newdef.wait)
-	}()
-	return newdef
-}
-
-// M a -> M b -> M (a, b)
-func (def *Async) And(other *Async) *Async {
-	newdef := &Async{nil, false, make(chan bool)}
-	go func() {
-		for _ = range def.wait {
-		}
-		for _ = range other.wait {
-		}
-
-		newdef.ret = concat(def.ret, other.ret)
 		newdef.done = true
 		close(newdef.wait)
 	}()
