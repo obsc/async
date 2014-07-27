@@ -7,24 +7,33 @@ import (
 // M a -> M b -> M (a, b)
 func (self *Async) And(other *Async) *Async {
 	return withNewAsync(func() []reflect.Value {
-		self.Wait()
-		other.Wait()
+		return concat(self.get(), other.get())
+	})
+}
 
-		return concat(self.ret, other.ret)
+// [](M a) -> M ([]a)
+func All(asyncs ...*Async) *Async {
+	return withNewAsync(func() []reflect.Value {
+		rets := make([][]reflect.Value, len(asyncs))
+		for i := range asyncs {
+			rets[i] = asyncs[i].get()
+		}
+		return concat(rets...)
 	})
 }
 
 // M a -> M a -> M a
 func (self *Async) Or(other *Async) *Async {
-	waitFor := func(a *Async) func() []reflect.Value {
-		return func() []reflect.Value {
-			a.Wait()
+	return withNewAsync(self.get, other.get)
+}
 
-			return a.ret
-		}
+// [](M a) -> M ([]a)
+func Any(asyncs ...*Async) *Async {
+	gets := make([]func() []reflect.Value, len(asyncs))
+	for i := range asyncs {
+		gets[i] = asyncs[i].get
 	}
-
-	return withNewAsync(waitFor(self), waitFor(other))
+	return withNewAsync(gets...)
 }
 
 // unit -> M unit

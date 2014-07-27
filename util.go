@@ -34,3 +34,8 @@ func (self *Async) complete(ret []reflect.Value) {
 	self.done = true
 	self.ret = ret
 }
+
+func (self *Async) get() []reflect.Value {
+	self.Wait()
+	return self.ret
+}
