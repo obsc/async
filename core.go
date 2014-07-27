@@ -5,6 +5,7 @@ import (
 )
 
 // Type: M a
+//
 // Represents the async monad
 type Async struct {
 	ret  []reflect.Value
