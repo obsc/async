@@ -6,33 +6,45 @@ import (
 	"time"
 )
 
-func timer() {
-	fmt.Println("starting timer")
-	time.Sleep(3 * time.Second)
-	fmt.Println("ending timer")
+func loop(n int, f func(i int)) {
+	for i := 0; i < n; i++ {
+		f(i)
+	}
 }
 
-func a() (m int, n int) {
-	fmt.Println("in a")
-	timer()
-	m = 10
-	n = 20
-	return
+func delay(wait int) func(string, int) (string, int) {
+	return func(prefix string, start int) (string, int) {
+		time.Sleep(time.Duration(wait) * time.Second)
+		return prefix, start
+	}
 }
 
-func b(x int, y int) {
-	fmt.Println("in b")
-	timer()
-	fmt.Println(x + y)
+func step(prefix string, v int, wait int) {
+	fmt.Printf("%v: %v\n", prefix, v)
+	time.Sleep(time.Duration(wait) * time.Second)
+}
+
+func cycle(interval int, num int) func(string, int) (string, int) {
+	return func(prefix string, start int) (string, int) {
+		loop(num, func(i int) {
+			step(prefix, start+i*interval, interval)
+		})
+		return prefix, start + num*interval
+	}
 }
 
 func main() {
-	async.Deferred(timer)
-	async.Deferred(a).Fmap(b).Fmap(a)
-	async.Return(5, 10).Fmap(b).Fmap(a)
-	async.Deferred(a).
-		Fmap(b).
-		Fmap(a)
-	time.Sleep(10 * time.Second)
+	async.Return("Actual", 0).
+		Fmap(cycle(3, 5)).
+		Fmap(cycle(3, 5))
+	async.Return("Actual", 1).
+		Fmap(delay(1)).
+		Fmap(cycle(3, 5)).
+		Fmap(cycle(3, 5))
+	async.Return("Actual", 2).
+		Fmap(delay(2)).
+		Fmap(cycle(3, 5)).
+		Fmap(cycle(3, 5))
+	async.Return("Expected", 0).Fmap(cycle(1, 30)).Wait()
 	fmt.Println("done")
 }
