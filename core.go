@@ -91,6 +91,26 @@ func (self *Async) Join(f interface{}) *Async {
 	})
 }
 
+// Type: M a -> (a -> b) -> unit
+//
+// End is the nonblocking version of WaitToEnd
+func (self *Async) End(f interface{}) {
+	go self.WaitToEnd(f)
+}
+
+// Type: M a -> (a -> b) -> unit
+//
+// WaitToEnd is a blocking function that executes a function on the return
+// of self. This ends the chain of Asyncs so there is no overheard of a channel
+// being instantiated.
+func (self *Async) WaitToEnd(f interface{}) {
+	self.Wait()
+
+	ffun := reflect.ValueOf(f)
+	ftyp := reflect.TypeOf(f)
+	ffun.Call(self.ret[0:ftyp.NumIn()])
+}
+
 // Type: M a -> bool
 //
 // IsDone returns whether or not self has becomed determined yet.
