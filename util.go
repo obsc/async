@@ -21,15 +21,19 @@ func concat(rets ...[]reflect.Value) []reflect.Value {
 func withNewAsync(fs ...func() []reflect.Value) *Async {
 	newAsync := &Async{nil, false, make(chan bool)}
 	for i := range fs {
-		go newAsync.complete(fs[i]())
+		go newAsync.completeAll(fs[i]())
 	}
 	return newAsync
 }
 
-func (self *Async) complete(ret []reflect.Value) {
+func (self *Async) completeAll(ret []reflect.Value) {
+	self.completeOne(ret)
+	self.done = true
+}
+
+func (self *Async) completeOne(ret []reflect.Value) {
 	defer recover()
 	close(self.wait)
-	self.done = true
 	self.ret = ret
 }
 
